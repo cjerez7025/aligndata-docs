@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Arquitectura Portal ARCOP</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#07090f;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  color:#dde8f5;
+  padding:48px 28px 80px;
+  min-height:100vh;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:36px 36px;
+}
+.page{max-width:1160px;margin:0 auto;position:relative}
+
+/* ── HEADER ── */
+.hdr{text-align:center;margin-bottom:56px}
+.pill{
+  display:inline-flex;align-items:center;gap:7px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
+  letter-spacing:2px;text-transform:uppercase;
+  border:1px solid rgba(255,255,255,.1);border-radius:99px;
+  padding:5px 16px;color:#4a5e78;margin-bottom:18px;
+}
+.dot{width:6px;height:6px;border-radius:50%;background:#00e59b;
+  box-shadow:0 0 8px #00e59b;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+h1{font-size:clamp(26px,3.5vw,40px);font-weight:800;letter-spacing:-1px}
+h1 em{font-style:normal;color:#00d4ff}
+.sub{font-size:12px;color:#2e4460;margin-top:8px;font-family:'IBM Plex Mono',monospace}
+
+/* ════════════════════════════════════════════
+   LAYOUT: 3 columnas
+   [Actores] [Flecha] [VERCEL BOX grande] [Flecha] [Firebase+Email]
+   ════════════════════════════════════════════ */
+.layout{
+  display:grid;
+  grid-template-columns: 170px 56px 1fr 56px 170px;
+  align-items:center;
+  gap:0;
+}
+
+/* ── ACTORES ── */
+.actors{display:flex;flex-direction:column;gap:10px}
+.actor{
+  padding:14px 16px;border-radius:12px;
+  border:1px solid rgba(157,126,248,.25);
+  background:rgba(157,126,248,.05);
+  position:relative;overflow:hidden;
+}
+.actor::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,#9d7ef8,transparent);
+}
+.ac-icon{font-size:20px;margin-bottom:6px}
+.ac-name{font-size:11px;font-weight:700;color:#fff;margin-bottom:2px}
+.ac-role{font-family:'IBM Plex Mono',monospace;font-size:8px;color:#3d4f6e;line-height:1.4}
+.chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+.chip{
+  font-family:'IBM Plex Mono',monospace;font-size:8px;
+  padding:2px 6px;border-radius:3px;
+  background:rgba(255,255,255,.04);color:#3d5068;
+  border:1px solid rgba(255,255,255,.07);
+}
+
+/* ── FLECHAS ── */
+.arrow{
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:4px;height:100%;padding:20px 0;
+}
+.arr-line{
+  width:2px;flex:1;min-height:40px;
+}
+.arr-line-left{
+  background:linear-gradient(to bottom,
+    transparent,rgba(157,126,248,.4) 30%,rgba(157,126,248,.4) 70%,transparent);
+}
+.arr-line-right{
+  background:linear-gradient(to bottom,
+    transparent,rgba(255,123,53,.4) 30%,rgba(255,123,53,.4) 70%,transparent);
+}
+.arr-head{
+  width:0;height:0;
+  border-left:5px solid transparent;
+  border-right:5px solid transparent;
+}
+.arr-head-down-purple{border-top:7px solid rgba(157,126,248,.6)}
+.arr-head-down-orange{border-top:7px solid rgba(255,123,53,.6)}
+.arr-head-up-purple{border-bottom:7px solid rgba(157,126,248,.4);border-top:none}
+.arr-head-up-orange{border-bottom:7px solid rgba(255,123,53,.4);border-top:none}
+.arr-label{
+  font-family:'IBM Plex Mono',monospace;font-size:8px;
+  writing-mode:vertical-rl;transform:rotate(180deg);
+  white-space:nowrap;letter-spacing:.5px;
+}
+.arr-label-left{color:#3a2e5c}
+.arr-label-right{color:#5c2e18}
+
+/* ════════════════════════════════════════════
+   VERCEL BOX — el contenedor grande
+   ════════════════════════════════════════════ */
+.vercel-box{
+  border:2px solid rgba(255,255,255,.18);
+  border-radius:22px;
+  overflow:hidden;
+  position:relative;
+  background:rgba(255,255,255,.02);
+  box-shadow:0 0 0 1px rgba(255,255,255,.04), 0 24px 80px rgba(0,0,0,.6);
+}
+/* header de vercel */
+.vb-header{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 20px;
+  background:rgba(255,255,255,.05);
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.vb-logo{
+  width:28px;height:28px;border-radius:6px;
+  background:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:900;color:#000;font-family:'Plus Jakarta Sans',sans-serif;
+  flex-shrink:0;
+}
+.vb-name{font-size:14px;font-weight:800;color:#fff;letter-spacing:-.3px}
+.vb-env{font-family:'IBM Plex Mono',monospace;font-size:9px;color:#3a5068;margin-left:4px}
+.vb-url{
+  margin-left:auto;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
+  color:#4a6a88;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:6px;padding:3px 10px;
+}
+.vb-dots{display:flex;gap:5px;margin-right:4px}
+.vbd{width:10px;height:10px;border-radius:50%}
+.vbd-r{background:#ff5f56}.vbd-y{background:#ffbd2e}.vbd-g{background:#27c93f}
+
+/* ── DOS PANELES INTERNOS ── */
+.vb-body{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+}
+.vb-divider{
+  position:absolute;
+  left:50%;top:52px;bottom:0;
+  width:1px;
+  background:rgba(255,255,255,.07);
+}
+/* etiqueta flotante entre paneles */
+.vb-divider-label{
+  position:absolute;
+  left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  background:#07090f;
+  border:1px solid rgba(0,212,255,.2);
+  border-radius:99px;
+  padding:4px 10px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:8px;color:#00d4ff;
+  white-space:nowrap;
+  z-index:2;
+}
+
+/* panel React */
+.panel-react{
+  padding:22px 20px;
+  border-right:1px solid rgba(255,255,255,.07);
+  position:relative;
+}
+.panel-node{
+  padding:22px 20px;
+}
+
+.panel-label{
+  display:inline-flex;align-items:center;gap:7px;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;
+  font-weight:700;text-transform:uppercase;letter-spacing:1.5px;
+  padding:4px 12px;border-radius:6px;margin-bottom:14px;
+}
+.pl-react{
+  background:rgba(0,212,255,.1);color:#00d4ff;
+  border:1px solid rgba(0,212,255,.25);
+}
+.pl-node{
+  background:rgba(0,229,155,.1);color:#00e59b;
+  border:1px solid rgba(0,229,155,.25);
+}
+
+.panel-title{font-size:15px;font-weight:700;color:#fff;margin-bottom:3px}
+.panel-desc{font-family:'IBM Plex Mono',monospace;font-size:9px;color:#2e4460;margin-bottom:16px;line-height:1.5}
+
+/* mini items dentro de los paneles */
+.pitem{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 12px;border-radius:9px;
+  margin-bottom:8px;
+  border:1px solid;
+}
+.pitem-react{
+  background:rgba(0,212,255,.04);
+  border-color:rgba(0,212,255,.12);
+}
+.pitem-node{
+  background:rgba(0,229,155,.04);
+  border-color:rgba(0,229,155,.12);
+}
+.pitem-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.pitem-name{font-size:11px;font-weight:700;color:#fff;margin-bottom:2px}
+.pitem-desc{font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#2e4460;line-height:1.5}
+.ptags{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.ptag{
+  font-family:'IBM Plex Mono',monospace;font-size:7.5px;
+  padding:1px 5px;border-radius:3px;
+}
+.ptag-c{background:rgba(0,212,255,.08);color:#00b3d6;border:1px solid rgba(0,212,255,.15)}
+.ptag-g{background:rgba(0,229,155,.08);color:#00b87a;border:1px solid rgba(0,229,155,.15)}
+
+/* rutas compactas */
+.routes{
+  margin-top:14px;
+  background:rgba(0,0,0,.25);
+  border:1px solid rgba(0,229,155,.1);
+  border-radius:8px;
+  padding:10px 12px;
+}
+.rt-head{
+  font-family:'IBM Plex Mono',monospace;font-size:8px;
+  text-transform:uppercase;letter-spacing:1.5px;color:#1e3a28;
+  margin-bottom:7px;
+}
+.rt-row{display:flex;align-items:center;gap:6px;padding:2px 0}
+.mth{
+  font-family:'IBM Plex Mono',monospace;font-size:7.5px;font-weight:700;
+  padding:2px 5px;border-radius:3px;min-width:34px;text-align:center;
+}
+.mg{background:rgba(0,212,255,.12);color:#00d4ff}
+.mp{background:rgba(0,229,155,.12);color:#00e59b}
+.mu{background:rgba(255,197,66,.12);color:#ffc542}
+.rt-path{font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#2a4a38}
+
+/* ── LADO DERECHO: Firebase + Email ── */
+.right-col{display:flex;flex-direction:column;gap:10px}
+
+.right-card{
+  padding:14px 16px;border-radius:12px;
+  position:relative;overflow:hidden;
+  border:1px solid;
+}
+.right-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+}
+.rc-fb{
+  background:rgba(255,123,53,.05);
+  border-color:rgba(255,123,53,.22);
+}
+.rc-fb::before{background:linear-gradient(90deg,#ff7b35,transparent)}
+.rc-email{
+  background:rgba(255,197,66,.05);
+  border-color:rgba(255,197,66,.2);
+}
+.rc-email::before{background:linear-gradient(90deg,#ffc542,transparent)}
+
+.rc-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.rc-icon{font-size:18px}
+.rc-title{font-size:12px;font-weight:700;color:#fff}
+.rc-badge{
+  margin-left:auto;
+  font-family:'IBM Plex Mono',monospace;font-size:8px;
+  padding:2px 7px;border-radius:4px;
+}
+.rcb-green{background:rgba(0,229,155,.1);color:#00e59b;border:1px solid rgba(0,229,155,.2)}
+.rcb-yellow{background:rgba(255,197,66,.1);color:#ffc542;border:1px solid rgba(255,197,66,.2)}
+.rc-desc{font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#2e4460;line-height:1.5}
+.rc-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px}
+.rc-tag{
+  font-family:'IBM Plex Mono',monospace;font-size:7.5px;
+  padding:2px 6px;border-radius:3px;
+}
+.rct-o{background:rgba(255,123,53,.1);color:#ff7b35;border:1px solid rgba(255,123,53,.2)}
+.rct-y{background:rgba(255,197,66,.1);color:#ffc542;border:1px solid rgba(255,197,66,.2)}
+
+/* ── COMPLIANCE ── */
+.compliance{
+  margin-top:36px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
+}
+.cpi{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:12px 14px;border-radius:10px;
+  background:rgba(0,229,155,.03);
+  border:1px solid rgba(0,229,155,.1);
+}
+.cpi-icon{
+  width:20px;height:20px;flex-shrink:0;
+  background:rgba(0,229,155,.1);border-radius:5px;
+  display:flex;align-items:center;justify-content:center;font-size:11px;
+}
+.cpi-text{font-size:10px;color:#2a4a38;line-height:1.5}
+.cpi-text strong{color:#00e59b;display:block;font-size:11px;margin-bottom:1px}
+
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .arrow,.actors,.right-col{display:none}
+  .vb-body{grid-template-columns:1fr}
+  .compliance{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="pill"><span class="dot"></span> Arquitectura Técnica · Portal ARCOP · 2026</div>
+    <h1>Portal <em>ARCOP</em> — Stack Completo</h1>
+    <p class="sub">React · Node.js Serverless · Firebase Santiago · Ley 21.719</p>
+  </div>
+
+  <!-- LAYOUT PRINCIPAL -->
+  <div class="layout">
+
+    <!-- ACTORES -->
+    <div class="actors">
+      <div class="actor">
+        <div class="ac-icon">👤</div>
+        <div class="ac-name">Ciudadano</div>
+        <div class="ac-role">Titular de datos. Ejerce derechos ARCO desde el portal.</div>
+        <div class="chips">
+          <span class="chip">Acceso</span><span class="chip">Rectif.</span>
+          <span class="chip">Cancelac.</span><span class="chip">Oposición</span>
+          <span class="chip">Portabilidad</span>
+        </div>
+      </div>
+      <div class="actor">
+        <div class="ac-icon">🛡️</div>
+        <div class="ac-name">DPO / Operador</div>
+        <div class="ac-role">Gestiona solicitudes, valida identidades, resuelve y genera reportes de cumplimiento.</div>
+        <div class="chips">
+          <span class="chip">Panel DPO</span><span class="chip">Dashboard</span>
+          <span class="chip">Reportes</span>
+        </div>
+      </div>
+      <div class="actor">
+        <div class="ac-icon">🏛️</div>
+        <div class="ac-name">Auditor / APDP</div>
+        <div class="ac-role">Accede a reportes de cumplimiento y audit log para fiscalización.</div>
+        <div class="chips">
+          <span class="chip">Audit log</span><span class="chip">Reportes</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLECHA IZQ -->
+    <div class="arrow">
+      <div class="arr-label arr-label-left">HTTPS · browser</div>
+      <div class="arr-line arr-line-left"></div>
+      <div class="arr-head arr-head-down-purple"></div>
+      <div style="height:16px"></div>
+      <div class="arr-head arr-head-up-purple"></div>
+      <div class="arr-line arr-line-left"></div>
+      <div class="arr-label arr-label-left">JSON response</div>
+    </div>
+
+    <!-- ════ VERCEL BOX ════ -->
+    <div class="vercel-box">
+
+      <!-- Header estilo macOS -->
+      <div class="vb-header">
+        <div class="vb-dots">
+          <div class="vbd vbd-r"></div>
+          <div class="vbd vbd-y"></div>
+          <div class="vbd vbd-g"></div>
+        </div>
+        <div class="vb-logo">▲</div>
+        <div>
+          <span class="vb-name">Vercel</span>
+          <span class="vb-env">— mismo proyecto, dos runtimes</span>
+        </div>
+        <div class="vb-url">arcop.cl</div>
+      </div>
+
+      <!-- DOS PANELES -->
+      <div class="vb-body">
+
+        <!-- PANEL REACT -->
+        <div class="panel-react">
+          <div class="panel-label pl-react">⚛️ React · Edge CDN</div>
+          <div class="panel-title">Frontend</div>
+          <div class="panel-desc">Archivos estáticos distribuidos globalmente.<br>Sin datos personales en esta capa.</div>
+
+          <div class="pitem pitem-react">
+            <div class="pitem-icon">📋</div>
+            <div>
+              <div class="pitem-name">Formularios ARCO</div>
+              <div class="pitem-desc">Un formulario por cada derecho. Validación visual en el cliente.</div>
+              <div class="ptags">
+                <span class="ptag ptag-c">src/pages</span>
+                <span class="ptag ptag-c">src/components</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pitem pitem-react">
+            <div class="pitem-icon">📊</div>
+            <div>
+              <div class="pitem-name">Panel DPO + Dashboard</div>
+              <div class="pitem-desc">Gestión de solicitudes, SLA visual, reportes, configuración de flujos.</div>
+              <div class="ptags">
+                <span class="ptag ptag-c">Chart.js</span>
+                <span class="ptag ptag-c">Tailwind</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pitem pitem-react">
+            <div class="pitem-icon">🔌</div>
+            <div>
+              <div class="pitem-name">Bus de Integración</div>
+              <div class="pitem-desc">React llama a <strong style="color:#00d4ff">/api/*</strong> (Node.js). Nunca habla directo a Firebase.</div>
+              <div class="ptags">
+                <span class="ptag ptag-c">src/adapters</span>
+                <span class="ptag ptag-c">dataService</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL NODE.JS -->
+        <div class="panel-node">
+          <div class="panel-label pl-node">🟢 Node.js 20 · Serverless Functions</div>
+          <div class="panel-title">Capa de Negocio</div>
+          <div class="panel-desc">Lógica del servidor en <strong style="color:#00e59b">api/*</strong>. Nunca llega al browser del usuario.</div>
+
+          <div class="pitem pitem-node">
+            <div class="pitem-icon">⚙️</div>
+            <div>
+              <div class="pitem-name">arcoService.js</div>
+              <div class="pitem-desc">Máquina de estados ARCO. Valida cada transición. Tokens con <code style="color:#00e59b">crypto.randomBytes</code>.</div>
+              <div class="ptags">
+                <span class="ptag ptag-g">crearSolicitud</span>
+                <span class="ptag ptag-g">cambiarEstado</span>
+                <span class="ptag ptag-g">validarIdentidad</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pitem pitem-node">
+            <div class="pitem-icon">⏱️</div>
+            <div>
+              <div class="pitem-name">slaService.js</div>
+              <div class="pitem-desc">15 días hábiles con feriados Chile 2026. Art. 11 Ley 21.719.</div>
+              <div class="ptags">
+                <span class="ptag ptag-g">calcularVencimiento</span>
+                <span class="ptag ptag-g">evaluarSLA</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pitem pitem-node">
+            <div class="pitem-icon">✅</div>
+            <div>
+              <div class="pitem-name">validacionService.js</div>
+              <div class="pitem-desc">RUT módulo 11 server-side. No bypasseable desde el browser.</div>
+              <div class="ptags">
+                <span class="ptag ptag-g">validarRUT</span>
+                <span class="ptag ptag-g">validarEmail</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pitem pitem-node">
+            <div class="pitem-icon">📧</div>
+            <div>
+              <div class="pitem-name">notificacionService.js</div>
+              <div class="pitem-desc">Emails transaccionales vía Resend. Fire-and-forget desde Node.</div>
+              <div class="ptags">
+                <span class="ptag ptag-g">recepción</span>
+                <span class="ptag ptag-g">validada</span>
+                <span class="ptag ptag-g">resuelta</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="routes">
+            <div class="rt-head">Endpoints</div>
+            <div class="rt-row"><span class="mth mp">POST</span><span class="rt-path">/api/solicitudes</span></div>
+            <div class="rt-row"><span class="mth mg">GET</span><span class="rt-path">/api/solicitudes</span></div>
+            <div class="rt-row"><span class="mth mu">PUT</span><span class="rt-path">/api/solicitudes/:id</span></div>
+            <div class="rt-row"><span class="mth mp">POST</span><span class="rt-path">/api/auth/validar</span></div>
+            <div class="rt-row"><span class="mth mg">GET</span><span class="rt-path">/api/config</span></div>
+          </div>
+        </div>
+
+      </div><!-- end vb-body -->
+    </div><!-- end vercel-box -->
+
+    <!-- FLECHA DER -->
+    <div class="arrow">
+      <div class="arr-label arr-label-right">Firebase Admin SDK</div>
+      <div class="arr-line arr-line-right"></div>
+      <div class="arr-head arr-head-down-orange"></div>
+      <div style="height:16px"></div>
+      <div class="arr-head arr-head-up-orange"></div>
+      <div class="arr-line arr-line-right"></div>
+      <div class="arr-label arr-label-right">datos persistidos</div>
+    </div>
+
+    <!-- DERECHA: Firebase + Email -->
+    <div class="right-col">
+
+      <div class="right-card rc-fb">
+        <div class="rc-hdr">
+          <div class="rc-icon">🔥</div>
+          <div class="rc-title">Firestore</div>
+          <div class="rc-badge rcb-green">Santiago ✅</div>
+        </div>
+        <div class="rc-desc">Datos personales, solicitudes, audit log y config. Región <strong style="color:#ff7b35">southamerica-west1</strong>. Art. 27 Ley 21.719.</div>
+        <div class="rc-tags">
+          <span class="rc-tag rct-o">/solicitudes</span>
+          <span class="rc-tag rct-o">/auditLog</span>
+          <span class="rc-tag rct-o">/config</span>
+          <span class="rc-tag rct-o">/contadores</span>
+        </div>
+      </div>
+
+      <div class="right-card rc-fb" style="border-color:rgba(255,123,53,.15)">
+        <div class="rc-hdr">
+          <div class="rc-icon">📁</div>
+          <div class="rc-title">Storage</div>
+          <div class="rc-badge rcb-green">Santiago ✅</div>
+        </div>
+        <div class="rc-desc">Archivos entregados al titular. URLs firmadas con expiración de 72 horas.</div>
+        <div class="rc-tags">
+          <span class="rc-tag rct-o">entregas/</span>
+          <span class="rc-tag rct-o">evidencias/</span>
+        </div>
+      </div>
+
+      <div class="right-card rc-email">
+        <div class="rc-hdr">
+          <div class="rc-icon">📨</div>
+          <div class="rc-title">Resend · Email</div>
+          <div class="rc-badge rcb-yellow">3K/mes gratis</div>
+        </div>
+        <div class="rc-desc">Notificaciones enviadas por Node.js de forma asíncrona. No bloquea la respuesta HTTP.</div>
+        <div class="rc-tags">
+          <span class="rc-tag rct-y">Recepción</span>
+          <span class="rc-tag rct-y">Validada</span>
+          <span class="rc-tag rct-y">Resuelta</span>
+          <span class="rc-tag rct-y">Rechazada</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- end layout -->
+
+  <!-- COMPLIANCE -->
+  <div class="compliance">
+    <div class="cpi">
+      <div class="cpi-icon">🌎</div>
+      <div class="cpi-text"><strong>Art. 27 — Sin transferencia</strong>Datos en Firebase Santiago. Nunca salen de Chile.</div>
+    </div>
+    <div class="cpi">
+      <div class="cpi-icon">🟢</div>
+      <div class="cpi-text"><strong>Negocio en Node.js</strong>RUT, SLA, estados y tokens en el servidor. No en el browser.</div>
+    </div>
+    <div class="cpi">
+      <div class="cpi-icon">🔑</div>
+      <div class="cpi-text"><strong>Credenciales seguras</strong>FIREBASE_PRIVATE_KEY y RESEND_API_KEY como Sensitive Vars en Vercel.</div>
+    </div>
+    <div class="cpi">
+      <div class="cpi-icon">▲</div>
+      <div class="cpi-text"><strong>Un solo despliegue</strong>React (CDN) y Node.js (Serverless) viven en el mismo proyecto Vercel.</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
