@@ -1,0 +1,41 @@
+# Sistema operativo
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# Editores
+*.swp
+*.swo
+*.bak
+*.tmp
+~$*
+.idea/
+.vscode/
+*.sublime-workspace
+
+# Archivos con información sensible — NUNCA en Git
+*.env
+secrets/
+credentials/
+*-passwords.*
+*-credentials.*
+*-tokens.*
+
+# Datos de clientes reales — NUNCA en Git
+clientes/
+datos-reales/
+*-cliente-real.*
+rut-*.txt
+datos-personales/
+
+# Carpetas de trabajo temporal
+drafts-privados/
+borrador-*/
+wip/
+
+# Archivos de Office en edición (los bloqueados por Word/Excel)
+~$*.docx
+~$*.xlsx
+~$*.pptx
