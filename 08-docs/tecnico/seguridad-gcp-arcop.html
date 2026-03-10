@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal ARCOP — Modelo de Seguridad GCP</title>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #020408;
+  --s1:      #060c14;
+  --s2:      #0a1220;
+  --s3:      #0f1a2e;
+  --border:  #0e1e35;
+  --border2: #162840;
+
+  /* Capas de seguridad — colores distintos por capa */
+  --layer1: #ff6b35;  /* Perímetro — naranja */
+  --layer2: #f5c518;  /* Identidad — amarillo */
+  --layer3: #00b4d8;  /* Datos — cyan */
+  --layer4: #06d6a0;  /* Audit — verde */
+  --layer5: #c77dff;  /* Secretos — púrpura */
+
+  /* Actores */
+  --citizen:  #38bdf8;
+  --dpo:      #a78bfa;
+  --auditor:  #fb923c;
+  --internal: #4ade80;
+
+  --text:  #cce0f5;
+  --muted: #2a4060;
+  --dim:   #0d1e32;
+}
+
+body {
+  background: var(--bg);
+  font-family: 'Familjen Grotesk', sans-serif;
+  color: var(--text);
+  min-height: 100vh;
+  padding: 52px 24px 80px;
+  overflow-x: hidden;
+}
+
+/* noise texture overlay */
+body::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: .4;
+}
+
+.page { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
+
+/* ── HEADER ── */
+.hdr { text-align: center; margin-bottom: 64px; }
+.hdr-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'Fira Code', monospace; font-size: 10px;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--layer4); border: 1px solid rgba(6,214,160,.2);
+  padding: 5px 18px; border-radius: 2px; margin-bottom: 20px;
+}
+.blink { width: 7px; height: 7px; border-radius: 50%; background: var(--layer4); box-shadow: 0 0 10px var(--layer4); animation: blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
+
+h1 { font-size: clamp(28px, 4vw, 48px); font-weight: 700; letter-spacing: -1.5px; color: #e8f4ff; margin-bottom: 8px; }
+h1 em { font-style: normal; color: var(--layer4); }
+.hdr-sub { font-family: 'Fira Code', monospace; font-size: 11px; color: var(--muted); }
+
+/* ── SEC LABEL ── */
+.sec {
+  font-family: 'Fira Code', monospace; font-size: 9px;
+  letter-spacing: 3px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 24px;
+  display: flex; align-items: center; gap: 12px;
+}
+.sec::before { content:''; width:20px; height:1px; background:var(--border2); }
+.sec::after  { content:''; flex:1; height:1px; background:var(--border2); }
+
+/* ══════════════════════════════════════════
+   MATRIZ ACTORES × DATOS
+   ══════════════════════════════════════════ */
+.matrix-wrap {
+  margin-bottom: 56px;
+  border: 1px solid var(--border2);
+  border-radius: 14px; overflow: hidden;
+}
+.matrix-table {
+  width: 100%; border-collapse: collapse;
+}
+.matrix-table th {
+  padding: 12px 16px;
+  font-family: 'Fira Code', monospace; font-size: 9px;
+  font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  background: var(--s2); border-bottom: 1px solid var(--border2);
+  border-right: 1px solid var(--border);
+  text-align: left;
+}
+.matrix-table th:first-child { width: 160px; color: var(--muted); }
+.th-citizen  { color: var(--citizen) !important; }
+.th-dpo      { color: var(--dpo) !important; }
+.th-auditor  { color: var(--auditor) !important; }
+.th-internal { color: var(--internal) !important; }
+
+.matrix-table td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  font-size: 11px; vertical-align: top;
+}
+.matrix-table tr:last-child td { border-bottom: none; }
+.matrix-table td:first-child {
+  font-family: 'Fira Code', monospace; font-size: 9px;
+  color: var(--text); background: var(--s1); font-weight: 700;
+}
+
+.access-cell { display: flex; flex-direction: column; gap: 4px; }
+.ac-yes  { display: inline-flex; align-items: center; gap: 5px; }
+.ac-no   { color: var(--muted); font-family: 'Fira Code', monospace; font-size: 9px; }
+
+.badge-access {
+  font-family: 'Fira Code', monospace; font-size: 8px;
+  padding: 2px 7px; border-radius: 3px; white-space: nowrap;
+}
+.ba-r  { background: rgba(56,189,248,.08); color: var(--citizen);  border: 1px solid rgba(56,189,248,.2); }
+.ba-w  { background: rgba(167,139,250,.08); color: var(--dpo);      border: 1px solid rgba(167,139,250,.2); }
+.ba-ro { background: rgba(251,146,60,.08);  color: var(--auditor);  border: 1px solid rgba(251,146,60,.2); }
+.ba-a  { background: rgba(74,222,128,.08);  color: var(--internal); border: 1px solid rgba(74,222,128,.2); }
+.ba-n  { background: rgba(255,255,255,.03); color: var(--muted);    border: 1px solid rgba(255,255,255,.06); }
+
+/* ══════════════════════════════════════════
+   CAPAS DE SEGURIDAD — el corazón del diagrama
+   ══════════════════════════════════════════ */
+.layers-wrap {
+  position: relative; margin-bottom: 56px;
+}
+
+/* cada capa es un bloque anidado visualmente */
+.layer {
+  border-radius: 14px; border: 1px solid; padding: 20px;
+  margin-bottom: 10px; position: relative; overflow: hidden;
+}
+.layer::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+}
+
+.l1 { border-color: rgba(255,107,53,.25); background: rgba(255,107,53,.025); }
+.l1::before { background: var(--layer1); }
+.l2 { border-color: rgba(245,197,24,.22); background: rgba(245,197,24,.02); }
+.l2::before { background: var(--layer2); }
+.l3 { border-color: rgba(0,180,216,.22); background: rgba(0,180,216,.02); }
+.l3::before { background: var(--layer3); }
+.l4 { border-color: rgba(6,214,160,.25); background: rgba(6,214,160,.025); }
+.l4::before { background: var(--layer4); }
+.l5 { border-color: rgba(199,125,255,.22); background: rgba(199,125,255,.02); }
+.l5::before { background: var(--layer5); }
+
+.layer-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+}
+.layer-num {
+  width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fira Code', monospace; font-size: 11px; font-weight: 700;
+}
+.ln1 { background: rgba(255,107,53,.15); color: var(--layer1); border: 1px solid rgba(255,107,53,.3); }
+.ln2 { background: rgba(245,197,24,.12); color: var(--layer2); border: 1px solid rgba(245,197,24,.3); }
+.ln3 { background: rgba(0,180,216,.12);  color: var(--layer3); border: 1px solid rgba(0,180,216,.3); }
+.ln4 { background: rgba(6,214,160,.12);  color: var(--layer4); border: 1px solid rgba(6,214,160,.3); }
+.ln5 { background: rgba(199,125,255,.12);color: var(--layer5); border: 1px solid rgba(199,125,255,.3); }
+
+.layer-title { font-size: 15px; font-weight: 700; color: #e8f4ff; }
+.layer-subtitle { font-family: 'Fira Code', monospace; font-size: 9px; color: var(--muted); margin-top: 1px; }
+
+.layer-badge {
+  margin-left: auto; font-family: 'Fira Code', monospace; font-size: 8px;
+  padding: 3px 10px; border-radius: 3px; font-weight: 700;
+}
+.lb1 { background: rgba(255,107,53,.12); color: var(--layer1); border: 1px solid rgba(255,107,53,.25); }
+.lb2 { background: rgba(245,197,24,.1);  color: var(--layer2); border: 1px solid rgba(245,197,24,.25); }
+.lb3 { background: rgba(0,180,216,.1);   color: var(--layer3); border: 1px solid rgba(0,180,216,.25); }
+.lb4 { background: rgba(6,214,160,.1);   color: var(--layer4); border: 1px solid rgba(6,214,160,.25); }
+.lb5 { background: rgba(199,125,255,.1); color: var(--layer5); border: 1px solid rgba(199,125,255,.25); }
+
+/* services dentro de cada capa */
+.layer-services {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.svc-block {
+  background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.06);
+  border-radius: 10px; padding: 12px 14px;
+  transition: border-color .2s;
+}
+.svc-block:hover { border-color: rgba(255,255,255,.12); }
+
+.sb-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sb-icon { font-size: 18px; flex-shrink: 0; }
+.sb-name { font-size: 12px; font-weight: 700; color: #ddeeff; }
+.sb-free {
+  margin-left: auto; font-family: 'Fira Code', monospace; font-size: 8px;
+  padding: 1px 6px; border-radius: 3px;
+  background: rgba(6,214,160,.08); color: var(--layer4);
+  border: 1px solid rgba(6,214,160,.18);
+}
+.sb-paid {
+  margin-left: auto; font-family: 'Fira Code', monospace; font-size: 8px;
+  padding: 1px 6px; border-radius: 3px;
+  background: rgba(245,197,24,.08); color: var(--layer2);
+  border: 1px solid rgba(245,197,24,.18);
+}
+.sb-desc {
+  font-family: 'Fira Code', monospace; font-size: 8.5px;
+  color: var(--muted); line-height: 1.6; margin-bottom: 8px;
+}
+.sb-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+.sb-tag {
+  font-family: 'Fira Code', monospace; font-size: 7.5px;
+  padding: 2px 6px; border-radius: 3px;
+}
+
+/* colores de tags por capa */
+.t1 { background: rgba(255,107,53,.07); color: rgba(255,107,53,.7); border: 1px solid rgba(255,107,53,.15); }
+.t2 { background: rgba(245,197,24,.07); color: rgba(245,197,24,.7); border: 1px solid rgba(245,197,24,.15); }
+.t3 { background: rgba(0,180,216,.07);  color: rgba(0,180,216,.7);  border: 1px solid rgba(0,180,216,.15); }
+.t4 { background: rgba(6,214,160,.07);  color: rgba(6,214,160,.7);  border: 1px solid rgba(6,214,160,.15); }
+.t5 { background: rgba(199,125,255,.07);color: rgba(199,125,255,.7);border: 1px solid rgba(199,125,255,.15); }
+
+/* resolvedor — qué amenaza protege */
+.sb-threat {
+  margin-top: 8px; padding: 6px 10px;
+  border-radius: 6px; background: rgba(255,255,255,.02);
+  border-left: 2px solid;
+  font-family: 'Fira Code', monospace; font-size: 8px;
+  line-height: 1.5;
+}
+.threat1 { border-color: var(--layer1); color: rgba(255,107,53,.6); }
+.threat2 { border-color: var(--layer2); color: rgba(245,197,24,.6); }
+.threat3 { border-color: var(--layer3); color: rgba(0,180,216,.6); }
+.threat4 { border-color: var(--layer4); color: rgba(6,214,160,.6); }
+.threat5 { border-color: var(--layer5); color: rgba(199,125,255,.6); }
+
+/* ══════════════════════════════════════════
+   FLUJO DE UNA BRECHA — qué pasa si algo falla
+   ══════════════════════════════════════════ */
+.breach-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 12px; margin-bottom: 56px;
+}
+.breach-card {
+  border-radius: 12px; border: 1px solid rgba(255,255,255,.07);
+  background: var(--s1); overflow: hidden;
+}
+.bc-header {
+  padding: 12px 16px; display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  background: rgba(255,255,255,.03);
+}
+.bc-scenario { font-size: 12px; font-weight: 700; color: #e0eeff; }
+.bc-body { padding: 14px 16px; }
+.bc-step {
+  display: flex; gap: 8px; padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.bc-step:last-child { border-bottom: none; }
+.step-n {
+  font-family: 'Fira Code', monospace; font-size: 9px;
+  color: var(--muted); min-width: 18px; padding-top: 1px;
+}
+.step-t { font-size: 11px; color: var(--text); line-height: 1.4; }
+.step-t small { font-family: 'Fira Code', monospace; font-size: 8px; color: var(--muted); display: block; margin-top: 2px; }
+.step-blocked {
+  display: inline-block; font-family: 'Fira Code', monospace; font-size: 8px;
+  padding: 1px 6px; border-radius: 3px; margin-top: 4px;
+  background: rgba(6,214,160,.08); color: var(--layer4);
+  border: 1px solid rgba(6,214,160,.2);
+}
+
+/* ══════════════════════════════════════════
+   TABLA RESUMEN COSTO / BENEFICIO
+   ══════════════════════════════════════════ */
+.cost-table {
+  border: 1px solid var(--border2); border-radius: 14px;
+  overflow: hidden; margin-bottom: 56px;
+}
+.ct-header {
+  display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;
+  padding: 10px 20px; background: var(--s2);
+  border-bottom: 1px solid var(--border2);
+}
+.ct-head {
+  font-family: 'Fira Code', monospace; font-size: 9px;
+  text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted);
+}
+.ct-row {
+  display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;
+  padding: 11px 20px; align-items: center;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.ct-row:last-child { border-bottom: none; }
+.ct-row:hover { background: rgba(255,255,255,.015); }
+
+.ct-service { font-size: 11px; font-weight: 600; color: #ddeeff; }
+.ct-service small { font-family: 'Fira Code', monospace; font-size: 8px; color: var(--muted); display: block; margin-top: 2px; }
+.ct-protege { font-family: 'Fira Code', monospace; font-size: 9px; }
+.ct-config  { font-family: 'Fira Code', monospace; font-size: 9px; color: var(--muted); }
+
+.pill { display: inline-block; font-family: 'Fira Code', monospace; font-size: 8px; padding: 2px 7px; border-radius: 3px; }
+.pill-c { background: rgba(56,189,248,.08); color: var(--citizen);  border: 1px solid rgba(56,189,248,.2); }
+.pill-i { background: rgba(6,214,160,.08);  color: var(--layer4);   border: 1px solid rgba(6,214,160,.2); }
+.pill-d { background: rgba(0,180,216,.08);  color: var(--layer3);   border: 1px solid rgba(0,180,216,.2); }
+.pill-all { background: rgba(199,125,255,.08); color: var(--layer5); border: 1px solid rgba(199,125,255,.2); }
+
+.price-free { font-family: 'Fira Code', monospace; font-size: 11px; font-weight: 700; color: var(--layer4); }
+.price-low  { font-family: 'Fira Code', monospace; font-size: 11px; font-weight: 700; color: var(--layer2); }
+.priority-critical { font-family: 'Fira Code', monospace; font-size: 8px; padding: 2px 7px; border-radius: 3px; background: rgba(255,107,53,.1); color: var(--layer1); border: 1px solid rgba(255,107,53,.25); }
+.priority-high     { font-family: 'Fira Code', monospace; font-size: 8px; padding: 2px 7px; border-radius: 3px; background: rgba(245,197,24,.1); color: var(--layer2); border: 1px solid rgba(245,197,24,.25); }
+.priority-med      { font-family: 'Fira Code', monospace; font-size: 8px; padding: 2px 7px; border-radius: 3px; background: rgba(0,180,216,.1); color: var(--layer3); border: 1px solid rgba(0,180,216,.25); }
+
+/* ── FOOTER ── */
+.footer {
+  text-align: center; font-family: 'Fira Code', monospace; font-size: 9px;
+  color: var(--dim); letter-spacing: 1px;
+  padding-top: 24px; border-top: 1px solid var(--border);
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-eyebrow"><span class="blink"></span> Portal ARCOP · Modelo de Seguridad · GCP · Marzo 2026</div>
+  <h1>5 capas de <em>seguridad</em> para Portal ARCOP</h1>
+  <p class="hdr-sub">Datos personales · Audit logs inmutables · Archivos · 4 actores · CIA completo</p>
+</div>
+
+
+<!-- ══ MATRIZ ACTORES × DATOS ══ -->
+<div class="sec">01 — quién puede hacer qué con cada tipo de dato</div>
+
+<div class="matrix-wrap">
+  <table class="matrix-table">
+    <thead>
+      <tr>
+        <th>Tipo de dato</th>
+        <th class="th-citizen">👤 Ciudadano</th>
+        <th class="th-dpo">🛡️ DPO / Operador</th>
+        <th class="th-auditor">🏛️ Auditor / APDP</th>
+        <th class="th-internal">⚙️ Equipo AlignData</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>🪪 RUT + datos personales</td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-r">Lee solo los suyos</span></span>
+          <span class="ac-yes"><span class="badge-access ba-w">Escribe al crear solicitud</span></span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-w">Lee + actualiza estado</span></span>
+          <span class="ac-yes"><span class="badge-access ba-r">Solo del cliente asignado</span></span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-no">— sin acceso a PII directa</span>
+          <span class="ac-yes"><span class="badge-access ba-ro">Solo metadatos anonimizados</span></span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-no">— acceso de emergencia</span>
+          <span class="ac-yes"><span class="badge-access ba-a">Con aprobación + log obligatorio</span></span>
+        </div></td>
+      </tr>
+      <tr>
+        <td>📋 Solicitudes ARCO</td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-r">Lee estado de las suyas</span></span>
+          <span class="ac-no">— no ve otras solicitudes</span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-w">CRUD completo</span></span>
+          <span class="ac-yes"><span class="badge-access ba-r">Todas del cliente asignado</span></span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-ro">Solo lectura · sin PII</span></span>
+          <span class="ac-yes"><span class="badge-access ba-ro">Estadísticas y métricas SLA</span></span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-a">Acceso técnico con log</span></span>
+          <span class="ac-no">— no modifica en prod directamente</span>
+        </div></td>
+      </tr>
+      <tr>
+        <td>📁 Archivos / evidencias</td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-r">Descarga via URL firmada 72h</span></span>
+          <span class="ac-yes"><span class="badge-access ba-w">Sube documentos propios</span></span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-w">Sube respuesta + evidencias</span></span>
+          <span class="ac-yes"><span class="badge-access ba-r">Descarga cualquier archivo del caso</span></span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-ro">Solo archivos de evidencia</span></span>
+          <span class="ac-no">— no archivos de respuesta al titular</span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-a">Acceso bucket con log + aprobación</span></span>
+        </div></td>
+      </tr>
+      <tr>
+        <td>📊 Audit log</td>
+        <td><div class="access-cell">
+          <span class="ac-no">— sin acceso</span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-r">Lee logs de sus propias acciones</span></span>
+          <span class="ac-no">— NO puede modificar ni borrar</span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-ro">Lectura completa · exportación</span></span>
+          <span class="ac-yes"><span class="badge-access ba-ro">Evidencia para APDP</span></span>
+        </div></td>
+        <td><div class="access-cell">
+          <span class="ac-yes"><span class="badge-access ba-a">Solo lectura en prod</span></span>
+          <span class="ac-no">— escritura solo via Cloud Run</span>
+        </div></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══ CAPAS DE SEGURIDAD ══ -->
+<div class="sec">02 — 5 capas de protección · de afuera hacia adentro</div>
+
+<div class="layers-wrap">
+
+  <!-- CAPA 1: PERÍMETRO -->
+  <div class="layer l1">
+    <div class="layer-header">
+      <div class="layer-num ln1">01</div>
+      <div>
+        <div class="layer-title">Capa de Perímetro</div>
+        <div class="layer-subtitle">Primera línea · filtra antes de llegar a la aplicación</div>
+      </div>
+      <span class="layer-badge lb1">CONFIDENCIALIDAD + DISPONIBILIDAD</span>
+    </div>
+    <div class="layer-services">
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🛡️</span>
+          <span class="sb-name">Cloud Armor</span>
+          <span class="sb-free">Incluido en Cloud Run</span>
+        </div>
+        <div class="sb-desc">WAF gestionado por Google. Filtra DDoS, SQL injection, XSS, path traversal antes de que el request llegue a Node.js. El portal público (formulario ciudadano) está completamente expuesto — Cloud Armor es la primera defensa.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t1">DDoS L3/L4/L7</span>
+          <span class="sb-tag t1">OWASP Top 10</span>
+          <span class="sb-tag t1">Rate limiting por IP</span>
+          <span class="sb-tag t1">Geo-blocking</span>
+        </div>
+        <div class="sb-threat threat1">Bloquea: bots que intentan llenar el formulario masivamente para generar trabajo falso al DPO</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🔒</span>
+          <span class="sb-name">HTTPS / TLS 1.3 obligatorio</span>
+          <span class="sb-free">$0 · automático</span>
+        </div>
+        <div class="sb-desc">Todo el tráfico cifrado en tránsito. Vercel gestiona el certificado del frontend, Cloud Run gestiona el del backend. Sin opción de HTTP plano. Crítico porque se transmiten RUTs en cada formulario.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t1">TLS 1.3</span>
+          <span class="sb-tag t1">HSTS</span>
+          <span class="sb-tag t1">Cert auto-renovado</span>
+        </div>
+        <div class="sb-threat threat1">Protege: RUT y email del ciudadano en tránsito entre browser → Cloud Run</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🌐</span>
+          <span class="sb-name">CORS restringido en Cloud Run</span>
+          <span class="sb-free">$0 · configuración código</span>
+        </div>
+        <div class="sb-desc">Cloud Run solo acepta requests desde los dominios de Vercel autorizados (ALLOWED_ORIGINS en env var). Nadie puede llamar la API desde un dominio distinto, aunque tenga el endpoint.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t1">Origin whitelist</span>
+          <span class="sb-tag t1">Preflight validation</span>
+        </div>
+        <div class="sb-threat threat1">Bloquea: sitio malicioso que intente hacer llamadas a la API usando cookies del DPO</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CAPA 2: IDENTIDAD -->
+  <div class="layer l2">
+    <div class="layer-header">
+      <div class="layer-num ln2">02</div>
+      <div>
+        <div class="layer-title">Capa de Identidad y Acceso</div>
+        <div class="layer-subtitle">Quién eres · qué puedes hacer · IAM + Firebase Auth + App Check</div>
+      </div>
+      <span class="layer-badge lb2">CONFIDENCIALIDAD</span>
+    </div>
+    <div class="layer-services">
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🔐</span>
+          <span class="sb-name">Firebase Authentication</span>
+          <span class="sb-free">$0 · email/pass ilimitado</span>
+        </div>
+        <div class="sb-desc">Emite JWT tokens firmados por Google para DPOs, auditores y equipo AlignData. Cloud Run verifica el token en cada request con Firebase Admin SDK. El ciudadano no necesita cuenta — se autentica por código de email temporal.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t2">JWT RS256</span>
+          <span class="sb-tag t2">Token expira 1h</span>
+          <span class="sb-tag t2">Refresh token</span>
+          <span class="sb-tag t2">Revocación instantánea</span>
+        </div>
+        <div class="sb-threat threat2">Protege: nadie sin cuenta válida puede leer ni escribir solicitudes, aunque conozca los endpoints</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">📱</span>
+          <span class="sb-name">Firebase App Check</span>
+          <span class="sb-free">$0 · configurable</span>
+        </div>
+        <div class="sb-desc">Verifica que el request viene de tu aplicación React real desplegada en Vercel, no de Postman, scripts Python o aplicaciones no autorizadas. Usa un attestation token ligado al dominio.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t2">reCAPTCHA v3</span>
+          <span class="sb-tag t2">App attestation</span>
+          <span class="sb-tag t2">Domain binding</span>
+        </div>
+        <div class="sb-threat threat2">Bloquea: atacante que obtiene el API key público de Firebase e intenta usarlo desde scripts propios</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🎭</span>
+          <span class="sb-name">IAM Roles GCP</span>
+          <span class="sb-free">$0 · nativo GCP</span>
+        </div>
+        <div class="sb-desc">Service Account de Cloud Run tiene solo los permisos mínimos: leer/escribir Firestore, leer/escribir Storage del proyecto específico. Ningún humano tiene acceso directo a producción. Todo pasa por el código.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t2">Principio mínimo privilegio</span>
+          <span class="sb-tag t2">Service Account por ambiente</span>
+          <span class="sb-tag t2">Sin acceso humano directo a prod</span>
+        </div>
+        <div class="sb-threat threat2">Protege: si un desarrollador es comprometido, no puede leer datos de producción directamente</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CAPA 3: DATOS -->
+  <div class="layer l3">
+    <div class="layer-header">
+      <div class="layer-num ln3">03</div>
+      <div>
+        <div class="layer-title">Capa de Protección de Datos</div>
+        <div class="layer-subtitle">Cifrado en reposo · en tránsito · separación PII · Firestore Security Rules</div>
+      </div>
+      <span class="layer-badge lb3">CONFIDENCIALIDAD + INTEGRIDAD</span>
+    </div>
+    <div class="layer-services">
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🔑</span>
+          <span class="sb-name">Cifrado en reposo — AES-256</span>
+          <span class="sb-free">$0 · automático GCP</span>
+        </div>
+        <div class="sb-desc">Firestore y Cloud Storage cifran todos los datos automáticamente con AES-256 antes de escribir en disco. No requiere configuración. Los backups también están cifrados.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t3">AES-256 automático</span>
+          <span class="sb-tag t3">Backups cifrados</span>
+          <span class="sb-tag t3">Keys gestionadas por Google</span>
+        </div>
+        <div class="sb-threat threat3">Protege: si alguien accede físicamente a un disco de GCP, los datos son ilegibles</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">📜</span>
+          <span class="sb-name">Firestore Security Rules</span>
+          <span class="sb-free">$0 · configuración</span>
+        </div>
+        <div class="sb-desc">Reglas declarativas que controlan quién lee/escribe qué colección. Aunque alguien bypass-ee Cloud Run y llegue directo a Firestore, las reglas impiden el acceso sin JWT válido con el rol correcto.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t3">Reglas por colección</span>
+          <span class="sb-tag t3">Validación JWT en regla</span>
+          <span class="sb-tag t3">Segunda línea vs bypass</span>
+        </div>
+        <div class="sb-threat threat3">Defensa en profundidad: si Cloud Run es bypasseado, Firestore igual rechaza el acceso</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🏗️</span>
+          <span class="sb-name">Separación PII por proyecto</span>
+          <span class="sb-free">$0 · arquitectura</span>
+        </div>
+        <div class="sb-desc">Cada cliente tiene su propio proyecto Firebase (clinicax-prod, hospitalxyz-prod). Un DPO de Clínica X con token válido no puede ver datos de Hospital XYZ porque apunta a un proyecto GCP completamente distinto.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t3">Aislamiento físico por cliente</span>
+          <span class="sb-tag t3">Sin multi-tenant riesgoso</span>
+          <span class="sb-tag t3">Un proyecto = un cliente</span>
+        </div>
+        <div class="sb-threat threat3">Protege: filtración de datos entre clientes — el mayor riesgo en portales SaaS</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🔗</span>
+          <span class="sb-name">URLs firmadas Storage (72h)</span>
+          <span class="sb-free">$0 · Firebase SDK</span>
+        </div>
+        <div class="sb-desc">Los archivos en Cloud Storage no tienen URL pública. Cloud Run genera URLs temporales firmadas de 72h para que el ciudadano descargue su respuesta. Pasado ese tiempo, el link es inválido.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t3">Expiración 72h</span>
+          <span class="sb-tag t3">Firmada con service account</span>
+          <span class="sb-tag t3">No indexable por Google</span>
+        </div>
+        <div class="sb-threat threat3">Protege: que una URL de descarga sea compartida o indexada accidentalmente</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CAPA 4: AUDIT -->
+  <div class="layer l4">
+    <div class="layer-header">
+      <div class="layer-num ln4">04</div>
+      <div>
+        <div class="layer-title">Capa de Auditoría Inmutable</div>
+        <div class="layer-subtitle">Toda acción registrada · no editable · exportable para APDP · Art. 14 bis Ley 21.719</div>
+      </div>
+      <span class="layer-badge lb4">INTEGRIDAD · EVIDENCIA LEGAL</span>
+    </div>
+    <div class="layer-services">
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">📋</span>
+          <span class="sb-name">Cloud Audit Logs (GCP)</span>
+          <span class="sb-free">400 GB/mes gratis</span>
+        </div>
+        <div class="sb-desc">Log de infraestructura gestionado por Google. Registra TODA operación sobre recursos GCP: quién accedió a Firestore, qué modificó en Storage, desde qué IP. No puede ser borrado por ningún usuario, ni administrador del proyecto.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t4">Inmutable por diseño</span>
+          <span class="sb-tag t4">Admin Activity logs</span>
+          <span class="sb-tag t4">Data Access logs</span>
+          <span class="sb-tag t4">Exportable a BigQuery</span>
+        </div>
+        <div class="sb-threat threat4">Evidencia legal: si la APDP fiscaliza, este log prueba que los datos no fueron alterados</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">📝</span>
+          <span class="sb-name">Audit Log de aplicación (Firestore)</span>
+          <span class="sb-free">$0 · dentro del free tier</span>
+        </div>
+        <div class="sb-desc">Colección /auditLog en Firestore donde Node.js registra cada acción semántica: "DPO Gonzáles cambió estado de VALIDADA a EN_PROCESO a las 14:32 del 10/03/2026". Solo Cloud Run puede escribir — reglas Firestore bloquean escritura directa.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t4">Actor + acción + timestamp</span>
+          <span class="sb-tag t4">Solo escritura via Cloud Run</span>
+          <span class="sb-tag t4">Lectura: DPO + Auditor</span>
+        </div>
+        <div class="sb-threat threat4">Complementa Cloud Audit Logs con semántica de negocio: "quién hizo qué en el proceso ARCO"</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">📦</span>
+          <span class="sb-name">Cloud Storage Object Versioning</span>
+          <span class="sb-free">$0.026/GB versiones antiguas</span>
+        </div>
+        <div class="sb-desc">Cada archivo subido mantiene su historial de versiones. Si un DPO sobreescribe accidentalmente una evidencia, la versión anterior no desaparece. Para archivos de respuesta al titular esto es integridad documental.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t4">Versiones históricas</span>
+          <span class="sb-tag t4">Soft delete configurable</span>
+          <span class="sb-tag t4">Restauración en 1 click</span>
+        </div>
+        <div class="sb-threat threat4">Protege: sobreescritura accidental o maliciosa de documentos de respuesta al titular</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CAPA 5: SECRETOS -->
+  <div class="layer l5">
+    <div class="layer-header">
+      <div class="layer-num ln5">05</div>
+      <div>
+        <div class="layer-title">Capa de Gestión de Secretos</div>
+        <div class="layer-subtitle">Credenciales fuera del código · rotación · acceso auditado · Secret Manager</div>
+      </div>
+      <span class="layer-badge lb5">CONFIDENCIALIDAD INTERNA</span>
+    </div>
+    <div class="layer-services">
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🗝️</span>
+          <span class="sb-name">Secret Manager GCP</span>
+          <span class="sb-free">$0.06 / 10K accesos</span>
+        </div>
+        <div class="sb-desc">Todas las credenciales (Resend API key, tokens de integración, claves de cifrado custom) viven en Secret Manager. Cloud Run las consume en runtime. Ningún desarrollador necesita ver los secretos de producción. Cada acceso queda logueado.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t5">Resend API key</span>
+          <span class="sb-tag t5">Rotación automática</span>
+          <span class="sb-tag t5">Acceso logueado</span>
+          <span class="sb-tag t5">Versionado de secretos</span>
+        </div>
+        <div class="sb-threat threat5">Protege: que un desarrollador que deja el equipo siga teniendo credenciales válidas de producción</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🤖</span>
+          <span class="sb-name">Service Account sin clave descargable</span>
+          <span class="sb-free">$0 · best practice GCP</span>
+        </div>
+        <div class="sb-desc">Cloud Run usa Workload Identity Federation — la Service Account está ligada al container, sin archivo JSON de clave que alguien pueda robar. La autenticación con Firebase Admin SDK es automática porque ambos están en GCP.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t5">Workload Identity</span>
+          <span class="sb-tag t5">Sin JSON key files</span>
+          <span class="sb-tag t5">Auto-auth en GCP</span>
+        </div>
+        <div class="sb-threat threat5">Elimina el riesgo número 1 de fuga: el archivo credentials.json subido accidentalmente a GitHub</div>
+      </div>
+
+      <div class="svc-block">
+        <div class="sb-top">
+          <span class="sb-icon">🔍</span>
+          <span class="sb-name">Security Command Center</span>
+          <span class="sb-free">Tier Standard gratis</span>
+        </div>
+        <div class="sb-desc">Monitoreo continuo de la postura de seguridad del proyecto GCP. Alerta si hay un bucket de Storage público accidentalmente, reglas de Firestore demasiado permisivas, o credenciales expuestas en código.</div>
+        <div class="sb-tags">
+          <span class="sb-tag t5">Misconfiguration detection</span>
+          <span class="sb-tag t5">Vulnerability scanning</span>
+          <span class="sb-tag t5">Alertas automáticas</span>
+        </div>
+        <div class="sb-threat threat5">Detecta: errores de configuración antes de que sean explotados</div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /layers-wrap -->
+
+
+<!-- ══ ESCENARIOS DE ATAQUE ══ -->
+<div class="sec">03 — qué pasa si algo falla · defensa en profundidad</div>
+
+<div class="breach-grid">
+
+  <div class="breach-card">
+    <div class="bc-header">
+      <span style="font-size:20px;">🕵️</span>
+      <div class="bc-scenario">Atacante externo intenta leer datos</div>
+    </div>
+    <div class="bc-body">
+      <div class="bc-step">
+        <span class="step-n">1.</span>
+        <div class="step-t">Intenta hacer scraping del formulario público masivamente
+          <small>Bot enviando 1.000 solicitudes falsas por minuto</small>
+          <span class="step-blocked">✓ Bloqueado: Cloud Armor rate limiting por IP</span>
+        </div>
+      </div>
+      <div class="bc-step">
+        <span class="step-n">2.</span>
+        <div class="step-t">Obtiene el VITE_FIREBASE_API_KEY del frontend (es público)
+          <small>Intenta leer directamente Firestore con ese key</small>
+          <span class="step-blocked">✓ Bloqueado: Firestore Security Rules requieren JWT válido</span>
+        </div>
+      </div>
+      <div class="bc-step">
+        <span class="step-n">3.</span>
+        <div class="step-t">Obtiene un JWT válido phisheando a un DPO
+          <small>Intenta leer datos de otro cliente con el token</small>
+          <span class="step-blocked">✓ Bloqueado: proyectos Firebase separados por cliente</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="breach-card">
+    <div class="bc-header">
+      <span style="font-size:20px;">👨‍💻</span>
+      <div class="bc-scenario">Desarrollador interno malintencionado</div>
+    </div>
+    <div class="bc-body">
+      <div class="bc-step">
+        <span class="step-n">1.</span>
+        <div class="step-t">Intenta acceder directamente a Firestore de producción
+          <small>Con su cuenta personal de Google</small>
+          <span class="step-blocked">✓ Bloqueado: IAM — no tiene rol en el proyecto prod</span>
+        </div>
+      </div>
+      <div class="bc-step">
+        <span class="step-n">2.</span>
+        <div class="step-t">Busca credenciales en el repositorio de código
+          <small>Revisando commits, env vars, etc.</small>
+          <span class="step-blocked">✓ Bloqueado: Secret Manager — no hay credenciales en el código</span>
+        </div>
+      </div>
+      <div class="bc-step">
+        <span class="step-n">3.</span>
+        <div class="step-t">Modifica un Cloud Audit Log para cubrir sus huellas
+          <small>Intenta borrar evidencia de su acceso</small>
+          <span class="step-blocked">✓ Imposible: Cloud Audit Logs son inmutables por diseño</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="breach-card">
+    <div class="bc-header">
+      <span style="font-size:20px;">🏛️</span>
+      <div class="bc-scenario">Fiscalización APDP sin previo aviso</div>
+    </div>
+    <div class="bc-body">
+      <div class="bc-step">
+        <span class="step-n">1.</span>
+        <div class="step-t">APDP pide evidencia de que el RUT del ciudadano nunca fue expuesto
+          <small>En los últimos 12 meses</small>
+          <span class="step-blocked">✓ Capa 4: Cloud Audit Logs exportados a BigQuery — respuesta en minutos</span>
+        </div>
+      </div>
+      <div class="bc-step">
+        <span class="step-n">2.</span>
+        <div class="step-t">APDP pide probar que los logs no fueron alterados
+          <small>Integridad de la evidencia</small>
+          <span class="step-blocked">✓ Capa 4: logs inmutables gestionados por Google, no por AlignData</span>
+        </div>
+      </div>
+      <div class="bc-step">
+        <span class="step-n">3.</span>
+        <div class="step-t">APDP verifica que los datos están en Chile
+          <small>Art. 27 Ley 21.719</small>
+          <span class="step-blocked">✓ Capa 3: proyecto GCP en southamerica-west1 (Santiago) — certificable</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══ TABLA RESUMEN COSTO / PRIORIDAD ══ -->
+<div class="sec">04 — resumen servicios · costo real · cuándo implementar</div>
+
+<div class="cost-table">
+  <div class="ct-header">
+    <span class="ct-head">Servicio GCP</span>
+    <span class="ct-head">Protege</span>
+    <span class="ct-head">Pilar CIA</span>
+    <span class="ct-head">Costo / mes</span>
+    <span class="ct-head">Prioridad</span>
+  </div>
+
+  <div class="ct-row">
+    <div class="ct-service">Cloud Armor<small>WAF + DDoS en Cloud Run</small></div>
+    <div class="ct-config">Ataques externos, bots, scraping</div>
+    <div><span class="pill pill-c">Confidencialidad</span> <span class="pill pill-d">Disponibilidad</span></div>
+    <div class="price-free">$0 básico</div>
+    <span class="priority-critical">CRÍTICO · ahora</span>
+  </div>
+
+  <div class="ct-row">
+    <div class="ct-service">Firebase Authentication<small>JWT para DPO, Auditor, Interno</small></div>
+    <div class="ct-config">Acceso no autorizado a datos</div>
+    <div><span class="pill pill-c">Confidencialidad</span></div>
+    <div class="price-free">$0 email/pass</div>
+    <span class="priority-critical">CRÍTICO · ahora</span>
+  </div>
+
+  <div class="ct-row">
+    <div class="ct-service">Firestore Security Rules<small>Segunda línea vs bypass de Cloud Run</small></div>
+    <div class="ct-config">Acceso directo a BD si alguien bypass-ea API</div>
+    <div><span class="pill pill-c">Confidencialidad</span></div>
+    <div class="price-free">$0 configuración</div>
+    <span class="priority-critical">CRÍTICO · ahora</span>
+  </div>
+
+  <div class="ct-row">
+    <div class="ct-service">Cloud Audit Logs<small>Infraestructura inmutable GCP</small></div>
+    <div class="ct-config">Evidencia legal para APDP</div>
+    <div><span class="pill pill-i">Integridad</span></div>
+    <div class="price-free">$0 · 400 GB/mes</div>
+    <span class="priority-critical">CRÍTICO · ahora</span>
+  </div>
+
+  <div class="ct-row">
+    <div class="ct-service">Secret Manager<small>Credenciales fuera del código</small></div>
+    <div class="ct-config">Fuga de API keys y credentials</div>
+    <div><span class="pill pill-c">Confidencialidad</span></div>
+    <div class="price-free">~$0 PYME</div>
+    <span class="priority-critical">CRÍTICO · ahora</span>
+  </div>
+
+  <div class="ct-row">
+    <div class="ct-service">IAM Mínimo Privilegio<small>Service Account por ambiente</small></div>
+    <div class="ct-config">Insider threat, rotación equipo</div>
+    <div><span class="pill pill-all">Los tres</span></div>
+    <div class="price-free">$0 configuración</div>
+    <span class="priority-critical">CRÍTICO · ahora</span>
+  </div>
+
+  <div class="ct-row">
+    <div class="ct-service">Firebase App Check<small>Verifica que calls vienen de tu app</small></div>
+    <div class="ct-config">Abuso de API desde scripts externos</div>
+    <div><span class="pill pill-c">Confidencialidad</span></div>
+    <div class="price-free">$0</div>
+    <span class="priority-high">ALTO · Sprint 7-8</span>
+  </div>
+
+  <div class="ct-row">
+    <div class="ct-service">Storage Object Versioning<small>Historial de archivos subidos</small></div>
+    <div class="ct-config">Sobreescritura de evidencias</div>
+    <div><span class="pill pill-i">Integridad</span></div>
+    <div class="price-low">~$0.03/GB extra</div>
+    <span class="priority-high">ALTO · Sprint 9-10</span>
+  </div>
+
+  <div class="ct-row">
+    <div class="ct-service">Security Command Center<small>Monitoreo continuo postura seguridad</small></div>
+    <div class="ct-config">Misconfigurations, vulnerabilidades</div>
+    <div><span class="pill pill-all">Los tres</span></div>
+    <div class="price-free">$0 tier Standard</div>
+    <span class="priority-med">MEDIO · con primer cliente</span>
+  </div>
+
+</div>
+
+<div class="footer">
+  AlignData Protect™ · Portal ARCOP · Modelo de Seguridad GCP · 5 capas · Ley 21.719 Chile · Marzo 2026
+</div>
+
+</div>
+</body>
+</html>
